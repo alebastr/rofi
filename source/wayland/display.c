@@ -65,6 +65,7 @@
 #endif
 #include "primary-selection-unstable-v1-protocol.h"
 #include "wlr-layer-shell-unstable-v1-protocol.h"
+#include "xdg-activation-v1-protocol.h"
 
 #define wayland_output_get_dpi(output, scale, dimension)                       \
   ((output)->current.physical_##dimension > 0 && (scale) > 0                   \
@@ -1302,6 +1303,10 @@ static void wayland_registry_handle_global(void *data,
              0) {
     wayland->primary_selection_device_manager = wl_registry_bind(
         registry, name, &zwp_primary_selection_device_manager_v1_interface, 1);
+  } else if (strcmp(interface, xdg_activation_v1_interface.name) == 0) {
+    wayland->global_names[WAYLAND_GLOBAL_XDG_ACTIVATION] = name;
+    wayland->xdg_activation =
+        wl_registry_bind(registry, name, &xdg_activation_v1_interface, 1);
   }
 #ifdef HAVE_WAYLAND_CURSOR_SHAPE
   else if (strcmp(interface, wp_cursor_shape_manager_v1_interface.name) == 0) {
@@ -1336,6 +1341,10 @@ static void wayland_registry_handle_global_remove(void *data,
     case WAYLAND_GLOBAL_LAYER_SHELL:
       zwlr_layer_shell_v1_destroy(wayland->layer_shell);
       wayland->layer_shell = NULL;
+      break;
+    case WAYLAND_GLOBAL_XDG_ACTIVATION:
+      xdg_activation_v1_destroy(wayland->xdg_activation);
+      wayland->xdg_activation = NULL;
       break;
     case WAYLAND_GLOBAL_SHM:
       wl_shm_destroy(wayland->shm);
@@ -1681,10 +1690,68 @@ static void wayland_display_dump_monitor_layout(void) {
   }
 }
 
+static void wayland_xdg_activation_token_done(
+    void *data, struct xdg_activation_token_v1 *token, const char *name) {
+  char **xdg_activation_token = data;
+  *xdg_activation_token = g_strdup(name);
+}
+
+static const struct xdg_activation_token_v1_listener token_listener = {
+    .done = wayland_xdg_activation_token_done,
+};
+
+static char *wayland_xdg_activation_get_token(wayland_stuff *wayland,
+                                              const char *app_id) {
+  if (wayland->xdg_activation == NULL) {
+    return NULL;
+  }
+
+  char *retv = NULL;
+  struct xdg_activation_token_v1 *token =
+      xdg_activation_v1_get_activation_token(wayland->xdg_activation);
+
+  if (app_id != NULL) {
+    xdg_activation_token_v1_set_app_id(token, app_id);
+  }
+  xdg_activation_token_v1_set_serial(token, wayland->last_seat->serial,
+                                     wayland->last_seat->seat);
+  xdg_activation_token_v1_set_surface(token, wayland->surface);
+  xdg_activation_token_v1_add_listener(token, &token_listener, &retv);
+  xdg_activation_token_v1_commit(token);
+  wl_display_roundtrip(wayland->display);
+  xdg_activation_token_v1_destroy(token);
+
+  return retv;
+}
+
+static void wayland_xdg_activation_setup_child_process(char *token) {
+  if (token != NULL) {
+    /* Similar to the handler from libstartup-notification-1. Equally unsafe. */
+    setenv("DESKTOP_STARTUP_ID", token, 1);
+    setenv("XDG_ACTIVATION_TOKEN", token, 1);
+  }
+}
+
 static void
 wayland_display_startup_notification(RofiHelperExecuteContext *context,
                                      GSpawnChildSetupFunc *child_setup,
-                                     gpointer *user_data) {}
+                                     gpointer *user_data) {
+  if (context == NULL) {
+    return;
+  }
+
+  const char *app_id = context->wmclass ? context->wmclass : context->app_id;
+  char *token = wayland_xdg_activation_get_token(wayland, app_id);
+  if (token == NULL) {
+    return;
+  }
+
+  *child_setup =
+      (GSpawnChildSetupFunc)wayland_xdg_activation_setup_child_process;
+  *user_data = token;
+  g_debug("xdg-activation token obtained");
+  /* g_free(token); (intentionally leaked) */
+}
 
 static int wayland_display_monitor_active(workarea *mon) {
   // TODO: do something?

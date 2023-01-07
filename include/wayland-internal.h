@@ -15,6 +15,7 @@ typedef enum {
   WAYLAND_GLOBAL_SHM,
   WAYLAND_GLOBAL_LAYER_SHELL,
   WAYLAND_GLOBAL_CURSOR_SHAPE,
+  WAYLAND_GLOBAL_XDG_ACTIVATION,
   _WAYLAND_GLOBAL_SIZE,
 } wayland_global_name;
 
@@ -50,6 +51,7 @@ typedef struct {
       *primary_selection_device_manager;
 
   struct zwlr_layer_shell_v1 *layer_shell;
+  struct xdg_activation_v1 *xdg_activation;
 
   struct wl_shm *shm;
   size_t buffer_count;

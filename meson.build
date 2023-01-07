@@ -88,7 +88,7 @@ if xcb_enabled
     ]
 endif
 
-wayland_protocols = dependency('wayland-protocols', version: '>= 1.17', required: wayland_enabled)
+wayland_protocols = dependency('wayland-protocols', version: '>= 1.21', required: wayland_enabled)
 
 if wayland_enabled
     deps += [
@@ -289,6 +289,7 @@ if wayland_enabled
     wayland_scanner = find_program('wayland-scanner')
     protocols = files(
         wayland_sys_protocols_dir + '/stable/xdg-shell/xdg-shell.xml',
+        wayland_sys_protocols_dir + '/staging/xdg-activation/xdg-activation-v1.xml',
         wayland_sys_protocols_dir + '/unstable/primary-selection/primary-selection-unstable-v1.xml',
         'protocols/wlr-foreign-toplevel-management-unstable-v1.xml',
         'protocols/wlr-layer-shell-unstable-v1.xml',
