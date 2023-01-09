@@ -298,6 +298,8 @@ typedef struct {
   const gchar *wmclass;
   /** The command we run */
   const gchar *command;
+  /** Indicate if the notification was requested with StartupNotify=true */
+  gboolean notify;
 } RofiHelperExecuteContext;
 
 /**

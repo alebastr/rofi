@@ -720,7 +720,7 @@ static void xcb_display_dump_monitor_layout(void) {
 static void xcb_display_startup_notification(RofiHelperExecuteContext *context,
                                              GSpawnChildSetupFunc *child_setup,
                                              gpointer *user_data) {
-  if (context == NULL) {
+  if (context == NULL || !context->notify) {
     return;
   }
 

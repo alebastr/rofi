@@ -844,7 +844,7 @@ static ModeMode window_mode_result(Mode *sw, int mretv,
       return RELOAD_DIALOG;
     }
 
-    RofiHelperExecuteContext context = {.name = NULL};
+    RofiHelperExecuteContext context = {.name = NULL, .notify = TRUE};
     if (!helper_execute_command(NULL, lf_cmd, run_in_term,
                                 run_in_term ? &context : NULL)) {
       retv = RELOAD_DIALOG;

@@ -114,6 +114,7 @@ static int execshssh(const SshEntry *entry) {
       .name = "ssh",
       .description = desc,
       .command = "ssh",
+      .notify = TRUE,
   };
   return helper_execute(NULL, args, "ssh ", entry->hostname, &context);
 }

@@ -381,8 +381,10 @@ static void exec_cmd_entry(DRunModeEntry *e, const char *path) {
       .icon = e->icon_name,
       .app_id = e->app_id,
   };
-  gboolean sn =
+  context.notify =
       g_key_file_get_boolean(e->key_file, e->action, "StartupNotify", NULL);
+  gboolean sn = context.notify || !g_key_file_has_key(e->key_file, e->action,
+                                                      "StartupNotify", NULL);
   gchar *wmclass = NULL;
   if (sn &&
       g_key_file_has_key(e->key_file, e->action, "StartupWMClass", NULL)) {
@@ -1207,7 +1209,7 @@ static ModeMode drun_mode_result(Mode *sw, int mretv, char **input,
     }
   } else if ((mretv & MENU_CUSTOM_INPUT) && *input != NULL &&
              *input[0] != '\0') {
-    RofiHelperExecuteContext context = {.name = NULL};
+    RofiHelperExecuteContext context = {.name = NULL, .notify = TRUE};
     gboolean run_in_term = ((mretv & MENU_CUSTOM_ACTION) == MENU_CUSTOM_ACTION);
     // FIXME: We assume startup notification in terminals, not in others
     if (!helper_execute_command(NULL, *input, run_in_term,
