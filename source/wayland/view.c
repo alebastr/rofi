@@ -266,6 +266,21 @@ static void wayland___create_window(MenuFlags menu_flags) {
   TICK_N("pango cairo font setup");
 
   WlState.flags = menu_flags;
+  // Setup dpi
+  PangoFontMap *font_map = pango_cairo_font_map_get_default();
+  if (config.dpi > 1) {
+    pango_cairo_font_map_set_resolution((PangoCairoFontMap *)font_map,
+                                        (double)config.dpi);
+  } else if (config.dpi == 0 || config.dpi == 1) {
+    // Auto-detect mode.
+    g_warning("DPI auto-detection is not implemented on Wayland");
+    config.dpi =
+        pango_cairo_font_map_get_resolution((PangoCairoFontMap *)font_map);
+  } else {
+    // default pango is 96.
+    config.dpi =
+        pango_cairo_font_map_get_resolution((PangoCairoFontMap *)font_map);
+  }
   // Setup font.
   // Dummy widget.
   box *win = box_create(NULL, "window", ROFI_ORIENTATION_HORIZONTAL);
