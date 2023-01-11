@@ -30,6 +30,7 @@ typedef struct {
   guint32 time;
 } widget_motion_event;
 
+typedef struct _wayland_output wayland_output;
 typedef struct _wayland_seat wayland_seat;
 
 typedef struct {
@@ -61,11 +62,12 @@ typedef struct {
   GHashTable *seats_by_name;
   wayland_seat *last_seat;
   GHashTable *outputs;
+  wayland_output *output;
   struct wl_surface *surface;
   struct zwlr_layer_surface_v1 *wlr_surface;
   struct wl_callback *frame_cb;
-  size_t scales[3];
   int32_t scale;
+  gboolean detect_dpi;
   NkBindingsSeat *bindings_seat;
 
   char *clipboard_default_data;

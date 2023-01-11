@@ -273,7 +273,7 @@ static void wayland___create_window(MenuFlags menu_flags) {
                                         (double)config.dpi);
   } else if (config.dpi == 0 || config.dpi == 1) {
     // Auto-detect mode.
-    g_warning("DPI auto-detection is not implemented on Wayland");
+    // The output is not known yet. Set the default value for now.
     config.dpi =
         pango_cairo_font_map_get_resolution((PangoCairoFontMap *)font_map);
   } else {

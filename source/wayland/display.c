@@ -70,11 +70,12 @@
        : 0)
 
 typedef struct _display_buffer_pool wayland_buffer_pool;
-typedef struct {
+struct _wayland_output {
   wayland_stuff *context;
   uint32_t global_name;
   struct wl_output *output;
   gchar *name;
+  int dpi;
   struct {
     int32_t x;
     int32_t y;
@@ -85,7 +86,7 @@ typedef struct {
     int32_t scale;
     int32_t transform;
   } current, pending;
-} wayland_output;
+};
 
 typedef struct {
   wayland_buffer_pool *pool;
@@ -222,19 +223,21 @@ void display_buffer_pool_free(wayland_buffer_pool *self) {
   wayland_buffer_cleanup(self);
 }
 
-static void wayland_surface_protocol_enter(void *data,
-                                           struct wl_surface *wl_surface,
-                                           struct wl_output *wl_output) {
-  wayland_output *output;
 
-  output = g_hash_table_lookup(wayland->outputs, wl_output);
-  if (output == NULL) {
-    return;
+static void wayland_display_update_output(wayland_output *output) {
+  wayland->output = output;
+
+  if (wayland->detect_dpi && output->dpi > 0 && config.dpi != output->dpi) {
+    g_debug("DPI changed %d -> %d", config.dpi, output->dpi);
+    // FIXME: pango_cairo_font_map_set_resolution
+    config.dpi = output->dpi;
   }
 
-  wl_surface_set_buffer_scale(wl_surface, output->current.scale);
+  wl_surface_set_buffer_scale(wayland->surface, output->current.scale);
 
   if (wayland->scale != output->current.scale) {
+    g_debug("Scale changed %" PRIi32 " -> %" PRIi32, wayland->scale,
+            output->current.scale);
     wayland->scale = output->current.scale;
 
     // create new buffers with the correct scaled size
@@ -245,6 +248,19 @@ static void wayland_surface_protocol_enter(void *data,
       rofi_view_set_size(state, -1, -1);
     }
   }
+}
+
+static void wayland_surface_protocol_enter(void *data,
+                                           struct wl_surface *wl_surface,
+                                           struct wl_output *wl_output) {
+  wayland_output *output;
+
+  output = g_hash_table_lookup(wayland->outputs, wl_output);
+  if (output == NULL) {
+    return;
+  }
+
+  wayland_display_update_output(output);
 }
 
 static void wayland_surface_protocol_leave(void *data,
@@ -1052,6 +1068,8 @@ static void wayland_output_done(void *data, struct wl_output *output) {
   wayland_output *self = data;
 
   self->current = self->pending;
+  // Assuming that density is equal on both axis
+  self->dpi = wayland_output_get_dpi(self, self->current.scale, height);
 
   g_debug("Output %s: %" PRIi32 "x%" PRIi32 " (%" PRIi32 "x%" PRIi32 "mm)"
           " position %" PRIi32 "x%" PRIi32 " scale %" PRIi32
@@ -1060,6 +1078,10 @@ static void wayland_output_done(void *data, struct wl_output *output) {
           self->current.height, self->current.physical_width,
           self->current.physical_height, self->current.x, self->current.y,
           self->current.scale, self->current.transform);
+
+  if (self == wayland->output) {
+    wayland_display_update_output(self);
+  }
 }
 
 static void wayland_output_geometry(void *data, struct wl_output *output,
@@ -1369,13 +1391,20 @@ static gboolean wayland_display_setup(GMainLoop *main_loop,
 }
 
 static gboolean wayland_display_late_setup(void) {
-  wayland_output *output = wayland_output_by_name(config.monitor);
-
+  wayland->output = wayland_output_by_name(config.monitor);
   wayland->surface = wl_compositor_create_surface(wayland->compositor);
   wayland->wlr_surface = zwlr_layer_shell_v1_get_layer_surface(
       wayland->layer_shell, wayland->surface,
-      (output != NULL ? output->output : NULL),
+      (wayland->output != NULL ? wayland->output->output : NULL),
       ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, "rofi");
+
+  if (config.dpi == 0 || config.dpi == 1) {
+    wayland->detect_dpi = TRUE;
+
+    if (wayland->output && wayland->output->dpi > 0) {
+      config.dpi = wayland->output->dpi;
+    }
+  }
 
   // Set size zero and anchor on all corners to get the usable screen size
   // see https://github.com/swaywm/wlroots/pull/2422
